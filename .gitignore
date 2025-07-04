@@ -1,0 +1,5 @@
+# Claude配置文件夹
+.claude/
+
+# 本地测试文件夹
+localtest/
