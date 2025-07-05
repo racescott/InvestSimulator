@@ -1,226 +1,88 @@
 # 📈 InvestSimulator
 
-> 股票投资模拟和定投策略回测平台
+> 股票定投策略回测平台 - 真实数据，专业分析
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Railway-blue)](https://investsimulator.up.railway.app/app)
-[![Deployment Status](https://img.shields.io/badge/Deployment-✅%20Online-success)](https://investsimulator.up.railway.app/app)
-[![Python](https://img.shields.io/badge/Python-3.8+-green)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-red)](https://fastapi.tiangolo.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/🌐_立即体验-Railway-blue)](https://investsimulator.up.railway.app/app)
+[![Deployment Status](https://img.shields.io/badge/状态-✅_在线-success)](https://investsimulator.up.railway.app/app)
+[![Data Coverage](https://img.shields.io/badge/数据覆盖-13K+_证券-orange)](https://investsimulator.up.railway.app/app)
 
-## 🚀 项目简介
+**立即体验**: [https://investsimulator.up.railway.app/app](https://investsimulator.up.railway.app/app)
 
-InvestSimulator 是一个全面的股票投资模拟和回测平台，专注于**定投策略(Dollar-Cost Averaging)**的效果分析。通过真实的历史数据，帮助投资者了解定投策略的长期收益表现。
+## 📋 功能特色
 
-### ✨ 核心特性
+- **💰 定投策略回测** - 模拟定期定额投资，分析长期收益
+- **📊 13,097+ 证券数据** - 覆盖美股、A股、ETF全市场
+- **📈 专业图表分析** - 交互式ECharts可视化投资表现  
+- **📱 全端适配** - 桌面、平板、手机完美支持
+- **⚡ 实时数据** - Yahoo Finance API提供最新行情
 
-- **📊 13,000+ 证券数据库** - 包含美股、A股和934+只ETF
-- **🎯 定投策略回测** - 模拟定期定额投资策略
-- **📈 可视化分析** - 交互式图表展示投资表现
-- **🌍 多市场支持** - 美股、A股、ETF全覆盖
-- **📱 响应式设计** - 支持桌面和移动端访问
-- **⚡ 实时数据** - 基于yfinance API获取最新数据
+## 💡 投资策略
 
-## 🎯 投资策略
+**定投回测 (Dollar-Cost Averaging)**
+- 🏦 初始投资 + 📅 月度定投 = 📈 长期收益分析
+- 📊 与投入本金对比，直观显示投资效果
+- 🎯 验证定投策略在不同市场环境下的表现
 
-### 定投策略 (Dollar-Cost Averaging)
-- **初始投资**: 一次性投入启动资金
-- **定期投资**: 每月固定金额持续投入
-- **纯买入策略**: 只买不卖，长期持有
-- **基准对比**: 与投入本金(零收益)对比，清晰展示投资效果
+## 🛠️ 技术栈
 
-## 🏗️ 技术架构
+**后端**: FastAPI + PostgreSQL + yfinance  
+**前端**: Vue.js + ECharts + Pico.css  
+**部署**: Railway云平台 + GitHub自动部署
 
-### 后端技术栈
-- **FastAPI** - 现代Python Web框架
-- **PostgreSQL** - 生产级数据库
-- **yfinance** - 金融数据获取
-- **pandas** - 数据处理和分析
+## 🚀 使用指南
 
-### 前端技术栈
-- **Vue.js 3** - 响应式前端框架
-- **ECharts** - 交互式图表库
-- **Pico.css** - 轻量级CSS框架
-- **现代JavaScript** - ES6+ 语法
-
-### 基础设施
-- **Railway** - 云平台部署
-- **PostgreSQL** - 云数据库
-- **GitHub Actions** - CI/CD (可选)
-
-## 🎮 快速开始
-
-### 🌐 在线体验
-**立即访问**: [https://investsimulator.up.railway.app/app](https://investsimulator.up.railway.app/app)
-
-**状态**: ✅ **生产环境运行中** | 📊 **13,097+股票数据** | 🚀 **实时回测可用**
+### 在线使用
+1. 访问 [https://investsimulator.up.railway.app/app](https://investsimulator.up.railway.app/app)
+2. 搜索股票：输入代码或名称（如：AAPL、SPY、茅台、600519）
+3. 设置参数：选择时间范围、初始投资、月投金额
+4. 开始回测：点击"开始定投回测"查看结果
 
 ### 本地开发
-
-#### 1. 克隆项目
 ```bash
 git clone https://github.com/racescott/InvestSimulator.git
 cd InvestSimulator
-```
-
-#### 2. 安装依赖
-```bash
 pip install -r requirements.txt
+
+# 启动后端 (需要PostgreSQL)
+cd backend && uvicorn main:app --reload --host 127.0.0.1 --port 8000
+
+# 启动前端
+cd frontend && python3 -m http.server 3000
 ```
 
-#### 3. 启动后端服务
-```bash
-cd backend
-uvicorn main:app --reload --host 127.0.0.1 --port 8000
-```
+## 📊 数据覆盖
 
-#### 4. 启动前端服务
-```bash
-cd frontend
-python3 -m http.server 3000
-```
+**13,097+ 全球证券数据** | **涵盖主流投资品种**
 
-#### 5. 访问应用
-- 前端: http://localhost:3000
-- API文档: http://localhost:8000/docs
+🇺🇸 **美股市场**: 个股 + 934+只ETF (传统指数、行业主题、杠杆产品)  
+🇨🇳 **A股市场**: 沪深两市全覆盖，自动识别交易所代码  
+🌍 **国际ETF**: 新兴市场、发达市场、商品、债券基金
 
-## 📊 支持的投资品种
+*支持按股票代码或公司名称搜索，如：AAPL、茅台、SPY等*
 
-### 美股 (US Market)
-- **大盘股**: AAPL, MSFT, GOOGL, AMZN, TSLA
-- **指数ETF**: SPY, QQQ, VTI, IVV
-- **行业ETF**: XLK (科技), XLF (金融), XLE (能源)
+## 📈 回测示例
 
-### A股 (Chinese Market)
-- **蓝筹股**: 600519 (茅台), 601318 (平安)
-- **成长股**: 腾讯、阿里巴巴等
-- **自动识别**: 上交所(.SS)和深交所(.SZ)
+**保守型策略**: SPY + 10,000初始 + 1,000月投 → 验证指数基金长期表现  
+**成长型策略**: QQQ + 5,000初始 + 500月投 → 科技股集中投资效果  
+**主题型策略**: ARKK + 2,000初始 + 200月投 → 创新主题高波动分析
 
-### ETF基金 (934+只)
-- **传统指数**: S&P 500, 纳斯达克, 全市场
-- **主题投资**: AI、区块链、清洁能源
-- **杠杆产品**: 2x/3x 多空ETF
-- **国际市场**: 新兴市场、发达市场
+## 🚀 自部署
 
-## 🔧 API 接口
+**一键部署到Railway**
+1. Fork项目到GitHub
+2. 在Railway连接仓库  
+3. 添加PostgreSQL服务
+4. 自动部署完成
 
-### 主要端点
-- `GET /` - 欢迎页面
-- `GET /api/search?q={query}` - 搜索股票/ETF
-- `GET /api/data/{market}/{code}` - 获取历史数据
-- `POST /api/backtest` - 执行定投回测
+## 📄 开源协议
 
-### 回测请求示例
-```json
-{
-  "market": "US",
-  "stock_code": "SPY",
-  "start_date": "2023-01-01",
-  "end_date": "2023-12-31",
-  "initial_investment": 10000,
-  "monthly_investment": 1000
-}
-```
+MIT License - 欢迎Fork和贡献代码
 
-## 📈 使用示例
+## 📧 联系信息
 
-### 保守型投资组合
-```
-标的: SPY (标普500ETF)
-初始投资: $10,000
-月投: $1,000
-预期年化收益: 8-10%
-```
-
-### 成长型投资组合
-```
-标的: QQQ (纳斯达克100ETF)
-初始投资: $5,000
-月投: $500
-预期年化收益: 10-12%
-```
-
-### 创新型投资组合
-```
-标的: ARKK (ARK创新ETF)
-初始投资: $2,000
-月投: $200
-预期年化收益: 高波动
-```
-
-## 🚀 部署到Railway
-
-### ✅ 当前部署状态
-- **平台**: Railway 云基础设施
-- **状态**: 生产环境稳定运行
-- **URL**: https://investsimulator.up.railway.app/app
-- **数据库**: PostgreSQL (13,097+ 股票/ETF数据)
-- **CI/CD**: GitHub自动部署
-
-### 🛠️ 部署特性
-- **自动数据库迁移**: `init_db.py`自动导入股票数据
-- **yfinance优化**: 解决Railway平台缓存目录问题
-- **三重备用机制**: 确保数据获取可靠性
-- **实时监控**: 详细的请求日志和错误追踪
-- **响应式设计**: 完美支持移动端访问
-
-### 📋 手动部署步骤
-1. Fork此项目到你的GitHub
-2. 在Railway连接GitHub仓库
-3. 添加PostgreSQL数据库服务
-4. 系统自动部署并初始化数据
-
-### 🔧 环境变量
-- `DATABASE_URL` - PostgreSQL连接字符串 (Railway自动配置)
-- `PORT` - 应用端口 (Railway自动配置)
-- `YF_USER_AGENT` - yfinance用户代理 (代码自动设置)
-
-## 🤝 贡献指南
-
-欢迎提交Issue和Pull Request！
-
-### 开发流程
-1. Fork项目
-2. 创建功能分支
-3. 提交代码
-4. 创建Pull Request
-
-### 代码规范
-- 使用Python 3.8+
-- 遵循PEP 8规范
-- 添加适当的注释
-- 确保测试通过
-
-## 📝 许可证
-
-本项目基于 [MIT License](LICENSE) 开源协议。
-
-## 🙏 致谢
-
-- [yfinance](https://github.com/ranaroussi/yfinance) - 金融数据API
-- [FastAPI](https://fastapi.tiangolo.com) - 现代Python Web框架
-- [Vue.js](https://vuejs.org) - 渐进式JavaScript框架
-- [ECharts](https://echarts.apache.org) - 数据可视化库
-- [Railway](https://railway.app) - 云平台部署
-
-## 📧 联系方式
-
-- 作者: racescott
-- 项目地址: https://github.com/racescott/InvestSimulator
-- 🌐 在线演示: **https://investsimulator.up.railway.app/app**
-- API文档: https://investsimulator.up.railway.app/docs
-
-## 🎯 项目亮点
-
-- ✅ **生产就绪**: 成功部署在Railway云平台
-- 📊 **完整数据**: 13,097+股票和ETF实时数据
-- 🚀 **高可用性**: 三重备用数据获取机制
-- 📱 **移动优化**: 完美支持手机和平板访问
-- 🔄 **自动部署**: GitHub CI/CD集成
-- 🛡️ **错误处理**: 全面的异常捕获和用户反馈
-- 📈 **专业图表**: ECharts交互式可视化
-- 🌍 **多市场**: 美股、A股、ETF全覆盖
+**作者**: racescott | **GitHub**: [InvestSimulator](https://github.com/racescott/InvestSimulator)  
+**在线演示**: https://investsimulator.up.railway.app/app
 
 ---
 
-**⚠️ 投资风险提示**: 本平台仅供学习和研究使用，不构成投资建议。投资有风险，入市需谨慎。
+**⚠️ 免责声明**: 本平台仅供学习研究，不构成投资建议。投资有风险，决策需谨慎。
