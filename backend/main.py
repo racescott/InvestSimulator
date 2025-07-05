@@ -8,7 +8,7 @@ import os
 import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from engine import run_backtest
+from engine import run_backtest, backtest_multiple
 
 # 解决yfinance缓存目录问题
 def setup_yfinance():
@@ -193,6 +193,18 @@ class BacktestRequest(BaseModel):
     initial_investment: float = 10000
     monthly_investment: float = 1000
 
+class StockInfo(BaseModel):
+    market: str
+    stock_code: str
+    name: str
+
+class MultipleBacktestRequest(BaseModel):
+    stocks: list[StockInfo]
+    start_date: str
+    end_date: str
+    initial_investment: float = 10000
+    monthly_investment: float = 1000
+
 @app.options("/api/backtest")
 async def backtest_options():
     """处理CORS预检请求"""
@@ -281,6 +293,93 @@ async def do_backtest(request: BacktestRequest):
         raise e
     except Exception as e:
         error_msg = f"回测过程中发生错误: {str(e)}"
+        print(f"Exception: {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@app.options("/api/backtest-multiple")
+async def backtest_multiple_options():
+    """处理CORS预检请求"""
+    return {"message": "OK"}
+
+@app.post("/api/backtest-multiple")
+async def do_backtest_multiple(request: MultipleBacktestRequest):
+    """执行多个股票的批量回测并返回结果"""
+    print(f"收到批量回测请求: {len(request.stocks)} 个股票")
+    
+    # 验证股票数量
+    if len(request.stocks) < 2:
+        raise HTTPException(status_code=400, detail="至少需要选择2个股票进行对比")
+    if len(request.stocks) > 5:
+        raise HTTPException(status_code=400, detail="最多支持5个股票同时对比")
+    
+    try:
+        # 收集每个股票的数据
+        stocks_data = []
+        for stock in request.stocks:
+            ticker = convert_to_yfinance_ticker(stock.stock_code, stock.market)
+            print(f"获取 {stock.name} ({ticker}) 的数据...")
+            
+            # 使用与单个回测相同的多重方法获取数据
+            data = pd.DataFrame()
+            
+            # 方法1: 标准yf.download
+            try:
+                data = yf.download(
+                    ticker, 
+                    start=request.start_date, 
+                    end=request.end_date, 
+                    auto_adjust=True,
+                    progress=False,
+                    threads=False
+                )
+            except Exception as e:
+                print(f"方法1失败 ({ticker}): {e}")
+            
+            # 方法2: 使用Ticker对象
+            if data.empty:
+                try:
+                    ticker_obj = yf.Ticker(ticker)
+                    data = ticker_obj.history(
+                        start=request.start_date,
+                        end=request.end_date,
+                        auto_adjust=True,
+                        timeout=30
+                    )
+                except Exception as e:
+                    print(f"方法2失败 ({ticker}): {e}")
+            
+            # 检查数据是否为空
+            if data.empty:
+                print(f"警告: {stock.name} ({ticker}) 无数据，跳过")
+                continue
+            
+            stocks_data.append({
+                'code': stock.stock_code,
+                'name': stock.name,
+                'data': data
+            })
+        
+        if len(stocks_data) < 2:
+            raise HTTPException(
+                status_code=404, 
+                detail="无法获取足够的股票数据进行对比，请检查股票代码和日期范围"
+            )
+        
+        # 执行批量回测
+        print(f"开始批量回测 {len(stocks_data)} 个股票...")
+        results = backtest_multiple(
+            stocks_data, 
+            request.initial_investment, 
+            request.monthly_investment
+        )
+        print("批量回测完成")
+        
+        return results
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        error_msg = f"批量回测过程中发生错误: {str(e)}"
         print(f"Exception: {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
 

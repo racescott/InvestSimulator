@@ -65,26 +65,67 @@
         </header>
 
         <article>
+            <!-- 模式切换 -->
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <button @click="toggleComparisonMode" :data-outline="!comparisonMode" style="width: auto;">
+                    {{ comparisonMode ? '📊 对比模式' : '📈 单股模式' }}
+                </button>
+            </div>
+
             <!-- 配置区域 -->
-            <div class="grid">
-                <!-- 股票搜索 -->
-                <div>
-                    <label for="stockSearch">股票搜索</label>
-                    <input type="search" id="stockSearch" placeholder="输入代码/名称, e.g., AAPL, 茅台" v-model="searchInput">
-                    <!-- 搜索结果列表 -->
-                    <div v-if="searchResults.length > 0" class="search-results">
-                        <ul>
-                            <li v-for="stock in searchResults" :key="stock.code" @click="selectStock(stock)">
-                                {{ stock.name }} ({{ stock.code }}) - {{ stock.market }}
-                            </li>
-                        </ul>
+            <div v-if="!comparisonMode">
+                <!-- 单股模式 -->
+                <div class="grid">
+                    <!-- 股票搜索 -->
+                    <div>
+                        <label for="stockSearch">股票搜索</label>
+                        <input type="search" id="stockSearch" placeholder="输入代码/名称, e.g., AAPL, 茅台" v-model="searchInput">
+                        <!-- 搜索结果列表 -->
+                        <div v-if="searchResults.length > 0" class="search-results">
+                            <ul>
+                                <li v-for="stock in searchResults" :key="stock.code" @click="selectStock(stock)">
+                                    {{ stock.name }} ({{ stock.code }}) - {{ stock.market }}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 已选股票显示 -->
+                    <div>
+                        <label>已选股票</label>
+                        <input type="text" :value="selectedStockInfo" readonly placeholder="请从上方搜索并选择">
+                    </div>
+                </div>
+            </div>
+            <div v-else>
+                <!-- 对比模式 -->
+                <div class="grid">
+                    <div>
+                        <label for="comparisonSearch">搜索并添加股票 (最多5个)</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="search" id="comparisonSearch" placeholder="输入代码/名称" v-model="comparisonSearchInput" style="flex: 1;">
+                            <button @click="addToComparison" :disabled="selectedStocksForComparison.length >= 5" style="width: auto;">添加</button>
+                        </div>
+                        <!-- 搜索结果列表 -->
+                        <div v-if="comparisonSearchResults.length > 0" class="search-results">
+                            <ul>
+                                <li v-for="stock in comparisonSearchResults" :key="stock.code" @click="selectForComparison(stock)">
+                                    {{ stock.name }} ({{ stock.code }}) - {{ stock.market }}
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 已选股票显示 -->
-                <div>
-                    <label>已选股票</label>
-                    <input type="text" :value="selectedStockInfo" readonly placeholder="请从上方搜索并选择">
+                <!-- 已选股票列表 -->
+                <div v-if="selectedStocksForComparison.length > 0" style="margin-top: 1rem;">
+                    <label>已选股票列表</label>
+                    <div style="background: var(--card-background-color); padding: 1rem; border-radius: var(--card-border-radius);">
+                        <div v-for="(stock, index) in selectedStocksForComparison" :key="stock.code" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span>{{ index + 1 }}. {{ stock.name }} ({{ stock.code }})</span>
+                            <button @click="removeFromComparison(index)" style="width: auto; padding: 0.25rem 0.5rem; margin: 0;">×</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -110,32 +151,66 @@
                 </div>
             </div>
             
-            <button @click="runBacktest" :aria-busy="isLoading" :disabled="isLoading || !selectedStock">
-                {{ isLoading ? '正在计算中...' : '🚀 开始定投回测' }}
+            <button @click="runBacktest" :aria-busy="isLoading" :disabled="isLoading || (!comparisonMode && !selectedStock) || (comparisonMode && selectedStocksForComparison.length < 2)">
+                {{ isLoading ? '正在计算中...' : (comparisonMode ? '🚀 开始对比回测' : '🚀 开始定投回测') }}
             </button>
         </article>
 
         <!-- 结果展示区域 -->
         <article v-if="backtestResult">
-            <header><strong>定投回测结果</strong></header>
-            <p><small>📊 以下对比显示定投策略的实际收益与投入本金（无收益）的差异</small></p>
+            <header><strong>{{ comparisonMode ? '多股票对比结果' : '定投回测结果' }}</strong></header>
+            <p><small>📊 {{ comparisonMode ? '以下对比显示多个股票的定投收益与投入本金的表现' : '以下对比显示定投策略的实际收益与投入本金（无收益）的差异' }}</small></p>
             
-            <div class="grid">
-                <div><strong>初始投资:</strong> {{ formatCurrency(backtestResult.initial_investment) }}</div>
-                <div><strong>每月定投:</strong> {{ formatCurrency(backtestResult.monthly_investment) }}</div>
-                <div><strong>累计投入:</strong> {{ formatCurrency(backtestResult.total_invested) }}</div>
-            </div>
+            <!-- 单股模式结果 -->
+            <div v-if="!comparisonMode">
+                <div class="grid">
+                    <div><strong>初始投资:</strong> {{ formatCurrency(backtestResult.initial_investment) }}</div>
+                    <div><strong>每月定投:</strong> {{ formatCurrency(backtestResult.monthly_investment) }}</div>
+                    <div><strong>累计投入:</strong> {{ formatCurrency(backtestResult.total_invested) }}</div>
+                </div>
 
-            <div class="grid">
-                <div><strong>最终资产:</strong> {{ formatCurrency(backtestResult.final_total) }}</div>
-                <div><strong>总收益率:</strong> <span :style="{ color: backtestResult.total_return_pct >= 0 ? 'green' : 'red' }">{{ backtestResult.total_return_pct.toFixed(2) }}%</span></div>
-                <div><strong>投资次数:</strong> {{ backtestResult.total_investments }}</div>
-            </div>
+                <div class="grid">
+                    <div><strong>最终资产:</strong> {{ formatCurrency(backtestResult.final_total) }}</div>
+                    <div><strong>总收益率:</strong> <span :style="{ color: backtestResult.total_return_pct >= 0 ? 'green' : 'red' }">{{ backtestResult.total_return_pct.toFixed(2) }}%</span></div>
+                    <div><strong>投资次数:</strong> {{ backtestResult.total_investments }}</div>
+                </div>
 
-            <div class="grid" v-if="backtestResult.max_drawdown_pct !== undefined">
-                <div><strong>绝对收益:</strong> <span :style="{ color: backtestResult.absolute_profit >= 0 ? 'green' : 'red' }">{{ formatCurrency(backtestResult.absolute_profit) }}</span></div>
-                <div><strong>最大回撤:</strong> <span :style="{ color: 'red' }">{{ backtestResult.max_drawdown_pct.toFixed(2) }}%</span></div>
-                <div><strong>投资月数:</strong> {{ backtestResult.strategy_stats.investment_period_months }}</div>
+                <div class="grid" v-if="backtestResult.max_drawdown_pct !== undefined">
+                    <div><strong>绝对收益:</strong> <span :style="{ color: backtestResult.absolute_profit >= 0 ? 'green' : 'red' }">{{ formatCurrency(backtestResult.absolute_profit) }}</span></div>
+                    <div><strong>最大回撤:</strong> <span :style="{ color: 'red' }">{{ backtestResult.max_drawdown_pct.toFixed(2) }}%</span></div>
+                    <div><strong>投资月数:</strong> {{ backtestResult.strategy_stats.investment_period_months }}</div>
+                </div>
+            </div>
+            
+            <!-- 对比模式结果 -->
+            <div v-else>
+                <div class="grid">
+                    <div><strong>初始投资:</strong> {{ formatCurrency(backtestResult.principal_data.initial_investment) }}</div>
+                    <div><strong>每月定投:</strong> {{ formatCurrency(backtestResult.principal_data.monthly_investment) }}</div>
+                    <div><strong>投资次数:</strong> {{ backtestResult.principal_data.total_investments }}</div>
+                </div>
+                
+                <!-- 对比结果表格 -->
+                <table role="grid" style="margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th scope="col">股票名称</th>
+                            <th scope="col">最终资产</th>
+                            <th scope="col">总收益率</th>
+                            <th scope="col">绝对收益</th>
+                            <th scope="col">最大回撤</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="result in backtestResult.results" :key="result.stock_code" v-if="result.success">
+                            <td>{{ result.stock_name }}</td>
+                            <td>{{ formatCurrency(result.result.final_total) }}</td>
+                            <td><span :style="{ color: result.result.total_return_pct >= 0 ? 'green' : 'red' }">{{ result.result.total_return_pct.toFixed(2) }}%</span></td>
+                            <td><span :style="{ color: result.result.absolute_profit >= 0 ? 'green' : 'red' }">{{ formatCurrency(result.result.absolute_profit) }}</span></td>
+                            <td><span style="color: red;">{{ result.result.max_drawdown_pct.toFixed(2) }}%</span></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
             <!-- ECharts 图表容器 -->
@@ -173,6 +248,13 @@
                 const searchResults = ref([]);
                 const selectedStock = ref(null);
                 
+                // 对比模式相关
+                const comparisonMode = ref(false);
+                const comparisonSearchInput = ref('');
+                const comparisonSearchResults = ref([]);
+                const selectedStocksForComparison = ref([]);
+                const comparisonTempStock = ref(null);
+                
                 const params = ref({
                     startDate: '2023-01-01',
                     endDate: '2023-12-31',
@@ -184,6 +266,7 @@
                 const backtestResult = ref(null);
                 let chartInstance = null;
                 let searchTimeout = null; // 用于搜索防抖
+                let comparisonSearchTimeout = null; // 对比模式搜索防抖
 
                 // --- 计算属性 ---
                 const selectedStockInfo = Vue.computed(() => {
@@ -222,10 +305,75 @@
                     searchResults.value = [];
                 };
 
+                // 对比模式相关方法
+                const toggleComparisonMode = () => {
+                    comparisonMode.value = !comparisonMode.value;
+                    // 切换模式时清空之前的结果
+                    backtestResult.value = null;
+                    if (chartInstance) {
+                        chartInstance.dispose();
+                        chartInstance = null;
+                    }
+                };
+
+                const fetchComparisonSearchResults = async () => {
+                    if (!comparisonSearchInput.value) {
+                        comparisonSearchResults.value = [];
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(comparisonSearchInput.value)}`);
+                        if (!response.ok) throw new Error('搜索请求失败');
+                        const data = await response.json();
+                        comparisonSearchResults.value = data;
+                    } catch (error) {
+                        console.error("搜索失败:", error);
+                        comparisonSearchResults.value = [];
+                    }
+                };
+
+                const selectForComparison = (stock) => {
+                    comparisonTempStock.value = stock;
+                    comparisonSearchInput.value = `${stock.name} (${stock.code})`;
+                    comparisonSearchResults.value = [];
+                };
+
+                const addToComparison = () => {
+                    if (!comparisonTempStock.value) {
+                        alert('请先搜索并选择一只股票！');
+                        return;
+                    }
+                    
+                    // 检查是否已经添加
+                    if (selectedStocksForComparison.value.some(s => s.code === comparisonTempStock.value.code)) {
+                        alert('该股票已经在对比列表中！');
+                        return;
+                    }
+                    
+                    if (selectedStocksForComparison.value.length >= 5) {
+                        alert('最多只能对比5只股票！');
+                        return;
+                    }
+                    
+                    selectedStocksForComparison.value.push(comparisonTempStock.value);
+                    comparisonSearchInput.value = '';
+                    comparisonTempStock.value = null;
+                };
+
+                const removeFromComparison = (index) => {
+                    selectedStocksForComparison.value.splice(index, 1);
+                };
+
                 const runBacktest = async () => {
                     // 验证输入
-                    if (!selectedStock.value) {
+                    if (!comparisonMode.value && !selectedStock.value) {
                         alert('请先选择一只股票！');
+                        return;
+                    }
+                    
+                    if (comparisonMode.value && selectedStocksForComparison.value.length < 2) {
+                        alert('请至少选择2只股票进行对比！');
                         return;
                     }
                     
@@ -243,29 +391,55 @@
                     backtestResult.value = null; // 清空旧结果
 
                     try {
-                        const requestBody = {
-                            market: selectedStock.value.market,
-                            stock_code: selectedStock.value.code,
-                            start_date: params.value.startDate,
-                            end_date: params.value.endDate,
-                            initial_investment: params.value.initialInvestment,
-                            monthly_investment: params.value.monthlyInvestment,
-                        };
+                        let response, data;
+                        
+                        if (!comparisonMode.value) {
+                            // 单股模式
+                            const requestBody = {
+                                market: selectedStock.value.market,
+                                stock_code: selectedStock.value.code,
+                                start_date: params.value.startDate,
+                                end_date: params.value.endDate,
+                                initial_investment: params.value.initialInvestment,
+                                monthly_investment: params.value.monthlyInvestment,
+                            };
 
-                        console.log('发送回测请求:', requestBody);
+                            console.log('发送回测请求:', requestBody);
 
-                        const response = await fetch(`${API_BASE_URL}/api/backtest`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(requestBody),
-                        });
+                            response = await fetch(`${API_BASE_URL}/api/backtest`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(requestBody),
+                            });
+                        } else {
+                            // 对比模式
+                            const requestBody = {
+                                stocks: selectedStocksForComparison.value.map(stock => ({
+                                    market: stock.market,
+                                    stock_code: stock.code,
+                                    name: stock.name
+                                })),
+                                start_date: params.value.startDate,
+                                end_date: params.value.endDate,
+                                initial_investment: params.value.initialInvestment,
+                                monthly_investment: params.value.monthlyInvestment,
+                            };
+
+                            console.log('发送批量回测请求:', requestBody);
+
+                            response = await fetch(`${API_BASE_URL}/api/backtest-multiple`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(requestBody),
+                            });
+                        }
 
                         if (!response.ok) {
                             const errorData = await response.json();
                             throw new Error(errorData.detail || '回测失败');
                         }
 
-                        const data = await response.json();
+                        data = await response.json();
                         console.log('回测结果:', data);
                         backtestResult.value = data;
 
@@ -290,11 +464,71 @@
                     }
                     chartInstance = echarts.init(chartDom);
 
-                    const equityData = backtestResult.value.equity_curve;
-                    const benchmarkData = backtestResult.value.benchmark_curve;
-                    const dates = Object.keys(equityData);
-                    const strategyValues = Object.values(equityData);
-                    const benchmarkValues = Object.values(benchmarkData);
+                    let dates, benchmarkValues, series, legendData;
+                    
+                    if (!comparisonMode.value) {
+                        // 单股模式
+                        const equityData = backtestResult.value.equity_curve;
+                        const benchmarkData = backtestResult.value.benchmark_curve;
+                        dates = Object.keys(equityData);
+                        const strategyValues = Object.values(equityData);
+                        benchmarkValues = Object.values(benchmarkData);
+                        
+                        legendData = ['定投收益', '投入本金'];
+                        series = [
+                            {
+                                name: '定投收益',
+                                type: 'line',
+                                data: strategyValues,
+                                smooth: true,
+                                showSymbol: false,
+                                color: '#c23531',
+                                lineStyle: { color: '#c23531', width: 2 },
+                                itemStyle: { color: '#c23531' },
+                                areaStyle: { opacity: 0.1, color: '#c23531' }
+                            }
+                        ];
+                    } else {
+                        // 对比模式
+                        const principalData = backtestResult.value.principal_data;
+                        dates = Object.keys(principalData.curve);
+                        benchmarkValues = Object.values(principalData.curve);
+                        
+                        const colors = ['#c23531', '#2f9e2f', '#d48265', '#91c7ae', '#749f83'];
+                        legendData = ['投入本金'];
+                        series = [];
+                        
+                        // 添加每个股票的曲线
+                        backtestResult.value.results.forEach((result, index) => {
+                            if (result.success) {
+                                legendData.push(result.stock_name);
+                                series.push({
+                                    name: result.stock_name,
+                                    type: 'line',
+                                    data: Object.values(result.result.equity_curve),
+                                    smooth: true,
+                                    showSymbol: false,
+                                    color: colors[index % colors.length],
+                                    lineStyle: { width: 2 },
+                                    emphasis: {
+                                        focus: 'series'
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
+                    // 添加本金基准线
+                    series.push({
+                        name: '投入本金',
+                        type: 'line',
+                        data: benchmarkValues,
+                        smooth: false,
+                        showSymbol: false,
+                        color: '#2f4554',
+                        lineStyle: { color: '#2f4554', width: 2, type: 'dashed' },
+                        itemStyle: { color: '#2f4554' }
+                    });
                     
                     // 检测是否为小屏幕设备（确保在渲染时获取最新尺寸）
                     const currentWidth = chartDom.clientWidth || window.innerWidth;
@@ -303,7 +537,7 @@
                     
                     const chartOption = {
                         title: { 
-                            text: '定投收益 vs. 投入本金',
+                            text: comparisonMode.value ? '多股票定投对比' : '定投收益 vs. 投入本金',
                             textStyle: { 
                                 fontSize: isMobileScreen ? 12 : (isSmallScreen ? 14 : 16) 
                             },
@@ -321,9 +555,10 @@
                             }
                         },
                         legend: { 
-                            data: ['定投收益', '投入本金'],
+                            data: legendData,
                             top: isMobileScreen ? 35 : (isSmallScreen ? 40 : 45),
-                            left: 'center'
+                            left: 'center',
+                            selected: comparisonMode.value ? {} : undefined
                         },
                         grid: { 
                             left: '3%', 
@@ -346,30 +581,7 @@
                             scale: true,
                             axisLabel: { formatter: '¥{value}' }
                         },
-                        series: [
-                            {
-                                name: '定投收益',
-                                type: 'line',
-                                data: strategyValues,
-                                smooth: true,
-                                showSymbol: false,
-                                color: '#c23531',
-                                lineStyle: { color: '#c23531', width: 2 },
-                                itemStyle: { color: '#c23531' },
-                                areaStyle: { opacity: 0.1, color: '#c23531' }
-                            },
-                            {
-                                name: '投入本金',
-                                type: 'line',
-                                data: benchmarkValues,
-                                smooth: false,  // 本金线不需要平滑，应该是阶梯状
-                                showSymbol: false,
-                                color: '#2f4554',
-                                lineStyle: { color: '#2f4554', width: 2, type: 'dashed' },  // 虚线表示基准
-                                itemStyle: { color: '#2f4554' }
-                                // 移除区域填充，因为本金线不需要
-                            }
-                        ]
+                        series: series
                     };
                     
                     chartInstance.setOption(chartOption, true);
@@ -401,8 +613,12 @@
                 // 添加点击外部关闭搜索结果的功能
                 const handleClickOutside = (event) => {
                     const searchContainer = document.querySelector('#stockSearch')?.parentElement;
+                    const comparisonContainer = document.querySelector('#comparisonSearch')?.parentElement;
                     if (searchContainer && !searchContainer.contains(event.target)) {
                         searchResults.value = [];
+                    }
+                    if (comparisonContainer && !comparisonContainer.contains(event.target)) {
+                        comparisonSearchResults.value = [];
                     }
                 };
 
@@ -419,6 +635,18 @@
                     }, 300); // 延迟300毫秒
                 });
 
+                // 对比模式搜索监听器
+                watch(comparisonSearchInput, (newValue) => {
+                    if (comparisonTempStock.value && `${comparisonTempStock.value.name} (${comparisonTempStock.value.code})` !== newValue) {
+                        comparisonTempStock.value = null;
+                    }
+                    
+                    clearTimeout(comparisonSearchTimeout);
+                    comparisonSearchTimeout = setTimeout(() => {
+                        fetchComparisonSearchResults();
+                    }, 300);
+                });
+
                 // --- 生命周期钩子 ---
                 onMounted(() => {
                     // 添加全局点击监听器
@@ -426,14 +654,27 @@
                 });
 
                 return {
+                    // 单股模式
                     searchInput,
                     searchResults,
                     selectedStock,
                     selectedStockInfo,
+                    selectStock,
+                    
+                    // 对比模式
+                    comparisonMode,
+                    comparisonSearchInput,
+                    comparisonSearchResults,
+                    selectedStocksForComparison,
+                    toggleComparisonMode,
+                    selectForComparison,
+                    addToComparison,
+                    removeFromComparison,
+                    
+                    // 共用
                     params,
                     isLoading,
                     backtestResult,
-                    selectStock,
                     runBacktest,
                     formatCurrency
                 };
