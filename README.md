@@ -2,7 +2,8 @@
 
 > 股票投资模拟和定投策略回测平台
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Railway-blue)](https://investsimulator.railway.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Railway-blue)](https://investsimulator.up.railway.app/app)
+[![Deployment Status](https://img.shields.io/badge/Deployment-✅%20Online-success)](https://investsimulator.up.railway.app/app)
 [![Python](https://img.shields.io/badge/Python-3.8+-green)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-red)](https://fastapi.tiangolo.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
@@ -49,8 +50,10 @@ InvestSimulator 是一个全面的股票投资模拟和回测平台，专注于*
 
 ## 🎮 快速开始
 
-### 在线体验
-访问 [Live Demo](https://investsimulator.railway.app) 立即体验
+### 🌐 在线体验
+**立即访问**: [https://investsimulator.up.railway.app/app](https://investsimulator.up.railway.app/app)
+
+**状态**: ✅ **生产环境运行中** | 📊 **13,097+股票数据** | 🚀 **实时回测可用**
 
 ### 本地开发
 
@@ -147,18 +150,30 @@ python3 -m http.server 3000
 
 ## 🚀 部署到Railway
 
-### 1. 一键部署
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/InvestSimulator)
+### ✅ 当前部署状态
+- **平台**: Railway 云基础设施
+- **状态**: 生产环境稳定运行
+- **URL**: https://investsimulator.up.railway.app/app
+- **数据库**: PostgreSQL (13,097+ 股票/ETF数据)
+- **CI/CD**: GitHub自动部署
 
-### 2. 手动部署
+### 🛠️ 部署特性
+- **自动数据库迁移**: `init_db.py`自动导入股票数据
+- **yfinance优化**: 解决Railway平台缓存目录问题
+- **三重备用机制**: 确保数据获取可靠性
+- **实时监控**: 详细的请求日志和错误追踪
+- **响应式设计**: 完美支持移动端访问
+
+### 📋 手动部署步骤
 1. Fork此项目到你的GitHub
 2. 在Railway连接GitHub仓库
-3. 添加PostgreSQL数据库
-4. 自动部署完成
+3. 添加PostgreSQL数据库服务
+4. 系统自动部署并初始化数据
 
-### 3. 环境变量
-- `DATABASE_URL` - PostgreSQL连接字符串 (自动设置)
-- `PORT` - 应用端口 (自动设置)
+### 🔧 环境变量
+- `DATABASE_URL` - PostgreSQL连接字符串 (Railway自动配置)
+- `PORT` - 应用端口 (Railway自动配置)
+- `YF_USER_AGENT` - yfinance用户代理 (代码自动设置)
 
 ## 🤝 贡献指南
 
@@ -192,7 +207,19 @@ python3 -m http.server 3000
 
 - 作者: racescott
 - 项目地址: https://github.com/racescott/InvestSimulator
-- 在线演示: https://investsimulator.railway.app
+- 🌐 在线演示: **https://investsimulator.up.railway.app/app**
+- API文档: https://investsimulator.up.railway.app/docs
+
+## 🎯 项目亮点
+
+- ✅ **生产就绪**: 成功部署在Railway云平台
+- 📊 **完整数据**: 13,097+股票和ETF实时数据
+- 🚀 **高可用性**: 三重备用数据获取机制
+- 📱 **移动优化**: 完美支持手机和平板访问
+- 🔄 **自动部署**: GitHub CI/CD集成
+- 🛡️ **错误处理**: 全面的异常捕获和用户反馈
+- 📈 **专业图表**: ECharts交互式可视化
+- 🌍 **多市场**: 美股、A股、ETF全覆盖
 
 ---
 
