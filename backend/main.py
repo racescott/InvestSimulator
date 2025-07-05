@@ -4,12 +4,33 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import yfinance as yf
-import pandas as pd
 import os
+import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from engine import run_backtest
+
+# 解决yfinance缓存目录问题
+def setup_yfinance():
+    """设置yfinance环境，解决部署平台缓存目录问题"""
+    try:
+        # 1. 创建缓存目录
+        cache_dir = os.path.expanduser("~/.cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # 2. 设置用户代理避免被屏蔽
+        os.environ['YF_USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        
+        print(f"✅ yfinance环境设置完成，缓存目录: {cache_dir}")
+        
+    except Exception as e:
+        print(f"⚠️ yfinance环境设置失败: {e}")
+
+# 初始化yfinance环境
+setup_yfinance()
+
+# 现在安全导入yfinance
+import yfinance as yf
 
 # --- 初始化 FastAPI App ---
 app = FastAPI()
@@ -46,70 +67,6 @@ def get_db_connection():
         print(f"数据库连接失败: {e}")
         return None
 
-def generate_mock_data(ticker: str, start_date: str, end_date: str):
-    """生成模拟股价数据用于演示"""
-    try:
-        import numpy as np
-        from datetime import datetime, timedelta
-        
-        start = datetime.strptime(start_date, '%Y-%m-%d')
-        end = datetime.strptime(end_date, '%Y-%m-%d')
-        
-        # 生成日期范围（只包含工作日）
-        dates = pd.bdate_range(start=start, end=end)
-        
-        if len(dates) == 0:
-            return pd.DataFrame()
-        
-        # 根据ticker设置基础价格和波动率
-        base_prices = {
-            'AAPL': 150, 'MSFT': 300, 'GOOGL': 100, 'AMZN': 120, 'TSLA': 200,
-            'SPY': 400, 'QQQ': 350, 'VTI': 200, 'IVV': 400,
-            '600519.SS': 1800, '601318.SS': 50  # A股
-        }
-        
-        base_price = base_prices.get(ticker, 100)
-        
-        # 生成随机价格走势（模拟真实股价波动）
-        np.random.seed(hash(ticker) % 1000)  # 基于ticker设置种子，确保可重复
-        
-        # 使用几何布朗运动模拟股价
-        n_days = len(dates)
-        dt = 1/252  # 日收益率
-        mu = 0.08   # 年化收益率 8%
-        sigma = 0.2 # 年化波动率 20%
-        
-        # 生成随机收益率
-        returns = np.random.normal(mu * dt, sigma * np.sqrt(dt), n_days)
-        
-        # 计算累积价格
-        price_path = base_price * np.exp(np.cumsum(returns))
-        
-        # 添加一些真实性：开高低收
-        close_prices = price_path
-        high_prices = close_prices * (1 + np.abs(np.random.normal(0, 0.01, n_days)))
-        low_prices = close_prices * (1 - np.abs(np.random.normal(0, 0.01, n_days)))
-        open_prices = np.roll(close_prices, 1)
-        open_prices[0] = base_price
-        
-        # 生成成交量
-        volumes = np.random.lognormal(15, 1, n_days).astype(int)
-        
-        # 创建DataFrame
-        mock_data = pd.DataFrame({
-            'Open': open_prices,
-            'High': high_prices,
-            'Low': low_prices,
-            'Close': close_prices,
-            'Volume': volumes
-        }, index=dates)
-        
-        print(f"生成了{len(mock_data)}天的{ticker}模拟数据，价格范围: {mock_data['Close'].min():.2f} - {mock_data['Close'].max():.2f}")
-        return mock_data
-        
-    except Exception as e:
-        print(f"生成模拟数据失败: {e}")
-        return pd.DataFrame()
 
 def convert_to_yfinance_ticker(stock_code: str, market: str) -> str:
     """根据市场将代码转换为 yfinance 格式"""
@@ -250,38 +207,63 @@ async def do_backtest(request: BacktestRequest):
     print(f"转换后的ticker: {ticker}")  # 调试日志
     
     try:
-        # 1. 获取数据 - 添加重试和更好的错误处理
+        # 1. 获取数据 - 多重方法和重试机制
         print(f"开始下载 {ticker} 的数据...")
-        data = yf.download(
-            ticker, 
-            start=request.start_date, 
-            end=request.end_date, 
-            auto_adjust=True,
-            progress=False,  # 关闭进度条
-            show_errors=False  # 关闭错误显示
-        )
+        data = pd.DataFrame()
         
-        print(f"下载完成，数据行数: {len(data)}")
-        
-        if data.empty:
-            # 尝试使用Ticker对象获取数据
-            print("尝试使用Ticker对象重新获取数据...")
-            ticker_obj = yf.Ticker(ticker)
-            data = ticker_obj.history(
-                start=request.start_date,
-                end=request.end_date,
-                auto_adjust=True
+        # 方法1: 标准yf.download
+        try:
+            data = yf.download(
+                ticker, 
+                start=request.start_date, 
+                end=request.end_date, 
+                auto_adjust=True,
+                progress=False,
+                threads=False  # 避免多线程问题
             )
-            
+            print(f"方法1完成，数据行数: {len(data)}")
+        except Exception as e:
+            print(f"方法1失败: {e}")
+        
+        # 方法2: 使用Ticker对象 (如果方法1失败)
         if data.empty:
-            # 如果无法获取真实数据，使用模拟数据进行演示
-            print("无法获取真实数据，生成模拟数据进行演示...")
-            data = generate_mock_data(ticker, request.start_date, request.end_date)
-            if data.empty:
-                raise HTTPException(
-                    status_code=404, 
-                    detail=f"无法获取 {ticker} 在 {request.start_date} 到 {request.end_date} 期间的数据。yfinance服务可能暂时不可用。"
+            try:
+                print("尝试使用Ticker对象...")
+                ticker_obj = yf.Ticker(ticker)
+                data = ticker_obj.history(
+                    start=request.start_date,
+                    end=request.end_date,
+                    auto_adjust=True,
+                    timeout=30
                 )
+                print(f"方法2完成，数据行数: {len(data)}")
+            except Exception as e:
+                print(f"方法2失败: {e}")
+        
+        # 方法3: 单独获取info然后历史数据 (如果前两种都失败)
+        if data.empty:
+            try:
+                print("尝试分步获取数据...")
+                ticker_obj = yf.Ticker(ticker)
+                # 先获取基本信息验证ticker有效性
+                info = ticker_obj.info
+                if info and 'symbol' in info:
+                    data = ticker_obj.history(
+                        period="1y",  # 改用period而不是日期范围
+                        auto_adjust=True
+                    )
+                    # 过滤到指定日期范围
+                    if not data.empty:
+                        data = data.loc[request.start_date:request.end_date]
+                print(f"方法3完成，数据行数: {len(data)}")
+            except Exception as e:
+                print(f"方法3失败: {e}")
+        
+        if data.empty:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"无法获取 {ticker} 的数据。可能原因：1)股票代码不存在 2)日期范围无效 3)Yahoo Finance服务暂时不可用"
+            )
 
         # 2. 运行回测引擎
         print("开始运行回测引擎...")
