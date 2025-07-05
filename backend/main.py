@@ -185,25 +185,53 @@ async def do_backtest(request: BacktestRequest):
     print(f"转换后的ticker: {ticker}")  # 调试日志
     
     try:
-        # 1. 获取数据
-        data = yf.download(ticker, start=request.start_date, end=request.end_date, auto_adjust=True)
+        # 1. 获取数据 - 添加重试和更好的错误处理
+        print(f"开始下载 {ticker} 的数据...")
+        data = yf.download(
+            ticker, 
+            start=request.start_date, 
+            end=request.end_date, 
+            auto_adjust=True,
+            progress=False,  # 关闭进度条
+            show_errors=False  # 关闭错误显示
+        )
+        
+        print(f"下载完成，数据行数: {len(data)}")
+        
         if data.empty:
-            raise HTTPException(status_code=404, detail="无法获取数据")
+            # 尝试使用Ticker对象获取数据
+            print("尝试使用Ticker对象重新获取数据...")
+            ticker_obj = yf.Ticker(ticker)
+            data = ticker_obj.history(
+                start=request.start_date,
+                end=request.end_date,
+                auto_adjust=True
+            )
+            
+        if data.empty:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"无法获取 {ticker} 在 {request.start_date} 到 {request.end_date} 期间的数据。请检查股票代码和日期范围。"
+            )
 
         # 2. 运行回测引擎
+        print("开始运行回测引擎...")
         results = run_backtest(data, request.initial_investment, request.monthly_investment)
+        print("回测完成")
         
         # 3. 返回结果
         return results
 
     except ValueError as e:
-        print(f"ValueError: {e}")  # 调试日志
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = f"数据验证错误: {str(e)}"
+        print(f"ValueError: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     except HTTPException as e:
         raise e
     except Exception as e:
-        print(f"Exception: {e}")  # 调试日志
-        raise HTTPException(status_code=500, detail=f"回测过程中发生错误: {str(e)}")
+        error_msg = f"回测过程中发生错误: {str(e)}"
+        print(f"Exception: {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # --- 静态文件服务 ---
 # 为前端提供静态文件服务
