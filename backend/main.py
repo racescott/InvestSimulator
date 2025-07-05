@@ -164,4 +164,17 @@ def do_backtest(request: BacktestRequest):
 
 # --- 静态文件服务 ---
 # 为前端提供静态文件服务
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
+import os
+from fastapi.responses import FileResponse
+
+# 静态文件目录
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+
+# 首页路由
+@app.get("/app")
+def read_index():
+    """返回前端页面"""
+    return FileResponse(os.path.join(static_dir, "index.html"))
+
+# 静态资源服务
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
