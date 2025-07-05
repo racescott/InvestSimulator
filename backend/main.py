@@ -20,7 +20,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Railway部署时会自动配置域名
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -62,6 +62,19 @@ def read_root():
 def health_check():
     """健康检查端点"""
     return {"status": "ok", "message": "API 正常运行"}
+
+@app.get("/api/routes")
+def list_routes():
+    """列出所有可用的路由"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'methods'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods),
+                "name": route.name
+            })
+    return {"routes": routes}
 
 @app.get("/api/search")
 def search_stocks(q: str = Query(..., min_length=1, description="搜索词，可以是代码或名称")):
@@ -142,6 +155,11 @@ class BacktestRequest(BaseModel):
     end_date: str
     initial_investment: float = 10000
     monthly_investment: float = 1000
+
+@app.options("/api/backtest")
+async def backtest_options():
+    """处理CORS预检请求"""
+    return {"message": "OK"}
 
 @app.post("/api/backtest")
 async def do_backtest(request: BacktestRequest):
