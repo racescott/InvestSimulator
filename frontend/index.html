@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定投回测模拟器</title>
+    
+    <!-- 引入 Pico.css 用于美化样式 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    
+    <!-- 引入 Vue.js (生产版本) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    
+    <!-- 引入 ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+    <style>
+        /* 自定义一些样式 */
+        body { padding-bottom: 5rem; }
+        .container { max-width: 960px; margin: 0 auto; }
+        #chart { width: 100%; height: 400px; margin-top: 2rem; }
+        
+        /* 小屏幕图表响应式适配 */
+        @media (max-width: 768px) {
+            #chart { height: 350px; }
+        }
+        @media (max-width: 480px) {
+            #chart { height: 300px; }
+        }
+        .search-results {
+            position: absolute;
+            background: var(--card-background-color);
+            border: var(--card-border-width) solid var(--card-border-color);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--card-box-shadow);
+            width: 100%;
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .search-results ul { list-style: none; padding: 0; margin: 0; }
+        .search-results li { padding: 0.5rem 1rem; cursor: pointer; border-bottom: 1px solid var(--border-color); }
+        .search-results li:last-child { border-bottom: none; }
+        .search-results li:hover { background: var(--primary-hover); color: var(--primary-inverse); }
+        .grid > div { position: relative; } /* 为了搜索结果定位 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+    </style>
+</head>
+<body>
+    <main class="container" id="app">
+        <header>
+            <h1 align="center">📈 定投回测模拟器</h1>
+            <p align="center">基于 yfinance 数据源，验证定投策略相对于本金的收益表现。</p>
+        </header>
+
+        <article>
+            <!-- 配置区域 -->
+            <div class="grid">
+                <!-- 股票搜索 -->
+                <div>
+                    <label for="stockSearch">股票搜索</label>
+                    <input type="search" id="stockSearch" placeholder="输入代码/名称, e.g., AAPL, 茅台" v-model="searchInput">
+                    <!-- 搜索结果列表 -->
+                    <div v-if="searchResults.length > 0" class="search-results">
+                        <ul>
+                            <li v-for="stock in searchResults" :key="stock.code" @click="selectStock(stock)">
+                                {{ stock.name }} ({{ stock.code }}) - {{ stock.market }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 已选股票显示 -->
+                <div>
+                    <label>已选股票</label>
+                    <input type="text" :value="selectedStockInfo" readonly placeholder="请从上方搜索并选择">
+                </div>
+            </div>
+
+            <div class="grid">
+                <div>
+                    <label for="startDate">开始日期</label>
+                    <input type="date" id="startDate" v-model="params.startDate">
+                </div>
+                <div>
+                    <label for="endDate">结束日期</label>
+                    <input type="date" id="endDate" v-model="params.endDate">
+                </div>
+            </div>
+
+            <div class="grid">
+                <div>
+                    <label for="initialInvestment">初始投资金额</label>
+                    <input type="number" id="initialInvestment" v-model.number="params.initialInvestment" min="1000" step="1000">
+                </div>
+                <div>
+                    <label for="monthlyInvestment">每月定投金额</label>
+                    <input type="number" id="monthlyInvestment" v-model.number="params.monthlyInvestment" min="100" step="100">
+                </div>
+            </div>
+            
+            <button @click="runBacktest" :aria-busy="isLoading" :disabled="isLoading || !selectedStock">
+                {{ isLoading ? '正在计算中...' : '🚀 开始定投回测' }}
+            </button>
+        </article>
+
+        <!-- 结果展示区域 -->
+        <article v-if="backtestResult">
+            <header><strong>定投回测结果</strong></header>
+            <p><small>📊 以下对比显示定投策略的实际收益与投入本金（无收益）的差异</small></p>
+            
+            <div class="grid">
+                <div><strong>初始投资:</strong> {{ formatCurrency(backtestResult.initial_investment) }}</div>
+                <div><strong>每月定投:</strong> {{ formatCurrency(backtestResult.monthly_investment) }}</div>
+                <div><strong>累计投入:</strong> {{ formatCurrency(backtestResult.total_invested) }}</div>
+            </div>
+
+            <div class="grid">
+                <div><strong>最终资产:</strong> {{ formatCurrency(backtestResult.final_total) }}</div>
+                <div><strong>总收益率:</strong> <span :style="{ color: backtestResult.total_return_pct >= 0 ? 'green' : 'red' }">{{ backtestResult.total_return_pct.toFixed(2) }}%</span></div>
+                <div><strong>投资次数:</strong> {{ backtestResult.total_investments }}</div>
+            </div>
+
+            <div class="grid" v-if="backtestResult.max_drawdown_pct !== undefined">
+                <div><strong>绝对收益:</strong> <span :style="{ color: backtestResult.absolute_profit >= 0 ? 'green' : 'red' }">{{ formatCurrency(backtestResult.absolute_profit) }}</span></div>
+                <div><strong>最大回撤:</strong> <span :style="{ color: 'red' }">{{ backtestResult.max_drawdown_pct.toFixed(2) }}%</span></div>
+                <div><strong>投资月数:</strong> {{ backtestResult.strategy_stats.investment_period_months }}</div>
+            </div>
+
+            <!-- ECharts 图表容器 -->
+            <div id="chart"></div>
+            
+            <div style="margin-top: 1rem; padding: 1rem; background: var(--card-background-color); border-radius: var(--card-border-radius);">
+                <small>
+                    <strong>📈 图表说明：</strong><br>
+                    • <span style="color: #c23531;">红色实线</span>：定投策略的资产价值变化<br>
+                    • <span style="color: #2f4554;">蓝色虚线</span>：累计投入本金（无投资收益的基准线）<br>
+                    • 红线在蓝线之上表示盈利，之下表示亏损
+                </small>
+            </div>
+        </article>
+
+        <!-- 加载遮罩 -->
+        <div v-if="isLoading" class="loading-overlay">
+            <progress></progress>
+        </div>
+    </main>
+
+    <script>
+        const { createApp, ref, watch, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // --- 后端 API 地址 ---
+                const API_BASE_URL = 'http://127.0.0.1:8000';
+
+                // --- 响应式数据 ---
+                const searchInput = ref('');
+                const searchResults = ref([]);
+                const selectedStock = ref(null);
+                
+                const params = ref({
+                    startDate: '2023-01-01',
+                    endDate: '2023-12-31',
+                    initialInvestment: 10000,
+                    monthlyInvestment: 1000,
+                });
+
+                const isLoading = ref(false);
+                const backtestResult = ref(null);
+                let chartInstance = null;
+                let searchTimeout = null; // 用于搜索防抖
+
+                // --- 计算属性 ---
+                const selectedStockInfo = Vue.computed(() => {
+                    if (selectedStock.value) {
+                        return `${selectedStock.value.name} (${selectedStock.value.code})`;
+                    }
+                    return '';
+                });
+
+                // --- 方法 ---
+                const fetchSearchResults = async () => {
+                    if (!searchInput.value || (selectedStock.value && searchInput.value === selectedStockInfo.value)) {
+                        searchResults.value = [];
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(searchInput.value)}`);
+                        if (!response.ok) throw new Error('搜索请求失败');
+                        const data = await response.json();
+                        searchResults.value = data;
+                    } catch (error) {
+                        console.error("搜索失败:", error);
+                        searchResults.value = [];
+                        // 可选：显示友好的错误提示
+                        if (searchInput.value.trim()) {
+                            // 只有当用户确实在搜索时才提示错误
+                            console.warn("搜索服务暂时不可用，请检查后端服务是否运行");
+                        }
+                    }
+                };
+
+                const selectStock = (stock) => {
+                    selectedStock.value = stock;
+                    searchInput.value = `${stock.name} (${stock.code})`;
+                    searchResults.value = [];
+                };
+
+                const runBacktest = async () => {
+                    // 验证输入
+                    if (!selectedStock.value) {
+                        alert('请先选择一只股票！');
+                        return;
+                    }
+                    
+                    if (params.value.initialInvestment <= 0 || params.value.monthlyInvestment <= 0) {
+                        alert('初始投资和每月定投金额必须大于0！');
+                        return;
+                    }
+                    
+                    if (new Date(params.value.startDate) >= new Date(params.value.endDate)) {
+                        alert('开始日期必须早于结束日期！');
+                        return;
+                    }
+                    
+                    isLoading.value = true;
+                    backtestResult.value = null; // 清空旧结果
+
+                    try {
+                        const requestBody = {
+                            market: selectedStock.value.market,
+                            stock_code: selectedStock.value.code,
+                            start_date: params.value.startDate,
+                            end_date: params.value.endDate,
+                            initial_investment: params.value.initialInvestment,
+                            monthly_investment: params.value.monthlyInvestment,
+                        };
+
+                        console.log('发送回测请求:', requestBody);
+
+                        const response = await fetch(`${API_BASE_URL}/api/backtest`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.detail || '回测失败');
+                        }
+
+                        const data = await response.json();
+                        console.log('回测结果:', data);
+                        backtestResult.value = data;
+
+                        await nextTick();
+                        renderChart();
+
+                    } catch (error) {
+                        console.error("回测请求失败:", error);
+                        alert(`回测失败: ${error.message}`);
+                    } finally {
+                        isLoading.value = false;
+                    }
+                };
+
+                const renderChart = () => {
+                    const chartDom = document.getElementById('chart');
+                    if (!chartDom) return;
+                    
+                    // 确保图表实例正确初始化
+                    if (chartInstance) {
+                        chartInstance.dispose();
+                    }
+                    chartInstance = echarts.init(chartDom);
+
+                    const equityData = backtestResult.value.equity_curve;
+                    const benchmarkData = backtestResult.value.benchmark_curve;
+                    const dates = Object.keys(equityData);
+                    const strategyValues = Object.values(equityData);
+                    const benchmarkValues = Object.values(benchmarkData);
+                    
+                    // 检测是否为小屏幕设备（确保在渲染时获取最新尺寸）
+                    const currentWidth = chartDom.clientWidth || window.innerWidth;
+                    const isSmallScreen = currentWidth <= 768;
+                    const isMobileScreen = currentWidth <= 480;
+                    
+                    const chartOption = {
+                        title: { 
+                            text: '定投收益 vs. 投入本金',
+                            textStyle: { 
+                                fontSize: isMobileScreen ? 12 : (isSmallScreen ? 14 : 16) 
+                            },
+                            left: 'center',
+                            top: 10
+                        },
+                        tooltip: { 
+                            trigger: 'axis',
+                            formatter: function (params) {
+                                let res = params[0].name + '<br/>';
+                                params.forEach(function (item) {
+                                    res += item.marker + ' ' + item.seriesName + ' : ¥' + item.value.toLocaleString() + '<br/>';
+                                });
+                                return res;
+                            }
+                        },
+                        legend: { 
+                            data: ['定投收益', '投入本金'],
+                            top: isMobileScreen ? 35 : (isSmallScreen ? 40 : 45),
+                            left: 'center'
+                        },
+                        grid: { 
+                            left: '3%', 
+                            right: '4%', 
+                            bottom: '8%', 
+                            top: isMobileScreen ? '20%' : (isSmallScreen ? '18%' : '15%'),
+                            containLabel: true 
+                        },
+                        xAxis: { 
+                            type: 'category', 
+                            data: dates, 
+                            boundaryGap: false,
+                            axisLabel: {
+                                rotate: 45,
+                                interval: Math.floor(dates.length / 8)
+                            }
+                        },
+                        yAxis: { 
+                            type: 'value', 
+                            scale: true,
+                            axisLabel: { formatter: '¥{value}' }
+                        },
+                        series: [
+                            {
+                                name: '定投收益',
+                                type: 'line',
+                                data: strategyValues,
+                                smooth: true,
+                                showSymbol: false,
+                                color: '#c23531',
+                                lineStyle: { color: '#c23531', width: 2 },
+                                itemStyle: { color: '#c23531' },
+                                areaStyle: { opacity: 0.1, color: '#c23531' }
+                            },
+                            {
+                                name: '投入本金',
+                                type: 'line',
+                                data: benchmarkValues,
+                                smooth: false,  // 本金线不需要平滑，应该是阶梯状
+                                showSymbol: false,
+                                color: '#2f4554',
+                                lineStyle: { color: '#2f4554', width: 2, type: 'dashed' },  // 虚线表示基准
+                                itemStyle: { color: '#2f4554' }
+                                // 移除区域填充，因为本金线不需要
+                            }
+                        ]
+                    };
+                    
+                    chartInstance.setOption(chartOption, true);
+                    
+                    // 确保图表正确渲染
+                    setTimeout(() => {
+                        if (chartInstance) {
+                            chartInstance.resize();
+                        }
+                    }, 100);
+                    
+                    // 响应式调整
+                    if (!window.chartResizeListener) {
+                        window.chartResizeListener = () => {
+                            if (chartInstance) {
+                                chartInstance.resize();
+                            }
+                        };
+                        window.addEventListener('resize', window.chartResizeListener);
+                    }
+                };
+
+                const formatCurrency = (value, useSymbol = true) => {
+                    if (typeof value !== 'number') return value;
+                    const options = useSymbol ? { style: 'currency', currency: 'CNY' } : {};
+                    return new Intl.NumberFormat('zh-CN', options).format(value);
+                };
+
+                // 添加点击外部关闭搜索结果的功能
+                const handleClickOutside = (event) => {
+                    const searchContainer = document.querySelector('#stockSearch')?.parentElement;
+                    if (searchContainer && !searchContainer.contains(event.target)) {
+                        searchResults.value = [];
+                    }
+                };
+
+                // --- 监听器 ---
+                watch(searchInput, (newValue) => {
+                    if (selectedStock.value && `${selectedStock.value.name} (${selectedStock.value.code})` !== newValue) {
+                        selectedStock.value = null;
+                    }
+                    
+                    // 添加防抖，避免用户每输入一个字母就发一次请求
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        fetchSearchResults();
+                    }, 300); // 延迟300毫秒
+                });
+
+                // --- 生命周期钩子 ---
+                onMounted(() => {
+                    // 添加全局点击监听器
+                    document.addEventListener('click', handleClickOutside);
+                });
+
+                return {
+                    searchInput,
+                    searchResults,
+                    selectedStock,
+                    selectedStockInfo,
+                    params,
+                    isLoading,
+                    backtestResult,
+                    selectStock,
+                    runBacktest,
+                    formatCurrency
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

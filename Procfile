@@ -1,0 +1,1 @@
+web: python init_db.py && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
