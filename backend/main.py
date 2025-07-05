@@ -58,6 +58,11 @@ def convert_to_yfinance_ticker(stock_code: str, market: str) -> str:
 def read_root():
     return {"message": "欢迎来到投资回测模拟器 API"}
 
+@app.get("/api/health")
+def health_check():
+    """健康检查端点"""
+    return {"status": "ok", "message": "API 正常运行"}
+
 @app.get("/api/search")
 def search_stocks(q: str = Query(..., min_length=1, description="搜索词，可以是代码或名称")):
     """根据用户输入，从数据库中搜索股票"""
@@ -139,9 +144,12 @@ class BacktestRequest(BaseModel):
     monthly_investment: float = 1000
 
 @app.post("/api/backtest")
-def do_backtest(request: BacktestRequest):
+async def do_backtest(request: BacktestRequest):
     """执行回测并返回结果"""
+    print(f"收到回测请求: {request}")  # 调试日志
+    
     ticker = convert_to_yfinance_ticker(request.stock_code, request.market)
+    print(f"转换后的ticker: {ticker}")  # 调试日志
     
     try:
         # 1. 获取数据
@@ -156,10 +164,12 @@ def do_backtest(request: BacktestRequest):
         return results
 
     except ValueError as e:
+        print(f"ValueError: {e}")  # 调试日志
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException as e:
         raise e
     except Exception as e:
+        print(f"Exception: {e}")  # 调试日志
         raise HTTPException(status_code=500, detail=f"回测过程中发生错误: {str(e)}")
 
 # --- 静态文件服务 ---
@@ -167,7 +177,7 @@ def do_backtest(request: BacktestRequest):
 import os
 from fastapi.responses import FileResponse
 
-# 静态文件目录
+# 静态文件目录  
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 
 # 首页路由
@@ -176,5 +186,11 @@ def read_index():
     """返回前端页面"""
     return FileResponse(os.path.join(static_dir, "index.html"))
 
-# 静态资源服务
+# favicon路由
+@app.get("/favicon.ico")
+def read_favicon():
+    """返回favicon"""
+    return FileResponse(os.path.join(static_dir, "favicon.ico"))
+
+# 静态资源服务 - 放在最后，避免覆盖API路由
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
