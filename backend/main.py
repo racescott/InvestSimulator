@@ -1,6 +1,6 @@
 # backend/main.py
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -23,6 +23,15 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# 请求调试中间件
+@app.middleware("http")
+async def debug_requests(request: Request, call_next):
+    print(f"收到请求: {request.method} {request.url}")
+    print(f"请求头: {dict(request.headers)}")
+    response = await call_next(request)
+    print(f"响应状态: {response.status_code}")
+    return response
 
 # --- 数据库和工具函数 ---
 # 数据库连接配置
@@ -75,6 +84,12 @@ def list_routes():
                 "name": route.name
             })
     return {"routes": routes}
+
+@app.post("/api/test")
+async def test_post(data: dict):
+    """简单的POST测试端点"""
+    print(f"收到测试POST请求: {data}")
+    return {"status": "success", "received": data}
 
 @app.get("/api/search")
 def search_stocks(q: str = Query(..., min_length=1, description="搜索词，可以是代码或名称")):
