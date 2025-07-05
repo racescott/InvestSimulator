@@ -205,6 +205,19 @@
             </div>
             
             <!-- 对比结果表格 -->
+            <div v-if="backtestResult.results">
+                <p><strong>调试信息：</strong>结果数组长度: {{ backtestResult.results.length }}</p>
+                <div v-for="(result, index) in backtestResult.results" :key="index" style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f0f0f0;">
+                    <p><strong>结果 {{ index + 1 }}:</strong></p>
+                    <p>Success: {{ result?.success }}</p>
+                    <p>Stock Code: {{ result?.stock_code }}</p>
+                    <p>Stock Name: {{ result?.stock_name }}</p>
+                    <p>Has Result: {{ !!result?.result }}</p>
+                    <p v-if="result?.result">Final Total: {{ result.result.final_total }}</p>
+                    <p v-if="result?.error">Error: {{ result.error }}</p>
+                </div>
+            </div>
+            
             <table role="grid" style="margin-top: 1rem;" v-if="backtestResult.results && backtestResult.results.length > 0">
                 <thead>
                     <tr>
